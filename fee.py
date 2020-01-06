@@ -6,6 +6,7 @@
 from base64 import b64encode
 import argparse
 import sys
+import zlib
 
 def print_help(parser):
     # custom print handler because we don't want any non-python
@@ -32,12 +33,15 @@ class CodeGenerator():
         self.output += f"{line}\n"
     
     def add_header(self):
-        self.add("import ctypes, os, base64")
+        self.add("import ctypes, os, base64, zlib")
         self.add("l = ctypes.CDLL(None)")
         self.add("s = l.syscall")
 
     def add_elf(self, elf: bytes):
-        self.add(f"e = base64.b64decode({b64encode(elf)})")
+        compressed_elf = zlib.compress(elf, 9)
+        encoded = b64encode(compressed_elf)
+        self.add(f"c = base64.b64decode({encoded})")
+        self.add(f"e = zlib.decompress(c)")
     
     def add_dump_elf(self, syscall: int):
         self.add(f"f = s({syscall}, '', 1)")
