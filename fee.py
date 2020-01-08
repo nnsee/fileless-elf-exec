@@ -8,12 +8,6 @@ import argparse
 import sys
 import zlib
 
-def print_help(parser):
-    # custom print handler because we don't want any non-python
-    # output to be printed to stdout
-    parser.print_help(file=sys.stderr)
-    sys.exit()
-
 class CodeGenerator():
     def __init__(self):
         self.output = ""
@@ -56,11 +50,16 @@ class CodeGenerator():
         self.add(f"os.execle(c, '{args}', {{}})")
 
 if __name__ == "__main__":
+    # we need to monkeypatch the help function to print to stderr
+    # as we want nothing but executable code being printed to stdout
+    def patched_help_call(self, parser, namespace, values, option_string=None):
+        parser.print_help(file=sys.stderr)
+        parser.exit()
+    
+    argparse._HelpAction.__call__ = patched_help_call
+
     parser = argparse.ArgumentParser(
-        description="Print Python code to stdout to execute an ELF without dropping files.",
-        add_help=False)
-    parser.add_argument('-h', '--help', action='store_true', 
-      help="print this help message and exit")
+        description="Print Python code to stdout to execute an ELF without dropping files.")
     parser.add_argument('path', type=argparse.FileType("rb"), 
       help="path to the ELF file")
     parser.add_argument('-s', '--syscall', metavar='NUM', type=int, 
@@ -75,10 +74,6 @@ if __name__ == "__main__":
       help="zlib compression level, 0-9 (default: 9)", choices=range(0, 10), default=9)
     args = parser.parse_args()
 
-    if args.help:
-        # todo: don't require positional args
-        print_help(parser) # exits with 0
-
     argv = args.argv
     if not argv:
         argv = args.path.name
@@ -88,7 +83,7 @@ if __name__ == "__main__":
     
     CG = CodeGenerator()
     CG.zCompressionLevel = args.compression_level
-    
+
     out = CG.generate(elf, args.syscall, argv)
     if args.with_command:
         out = CG.with_command(args.python_path)

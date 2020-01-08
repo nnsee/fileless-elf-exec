@@ -54,7 +54,7 @@ positional arguments:
   path                  path to the ELF file
 
 optional arguments:
-  -h, --help            print this help message and exit
+  -h, --help            show this help message and exit
   -s NUM, --syscall NUM
                         syscall number for memfd_create for the target
                         platform (default: 319)
