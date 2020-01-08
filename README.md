@@ -43,9 +43,7 @@ If you want to customise the arguments, use the `--argv` flag (`-a`):
 $ ./fee.py -a "killall sshd" ./busybox > output.py
 ```
 
-__IMPORTANT!__ By default, the script uses the x86-64 syscall number for `memfd_create`. This is different for targets with a different architecture (32-bit x86, ARM, ARM64, MIPS, etc).
-
-You need to search for `memfd_create` in your target's architecture's syscall table. This is located in various places in the Linux kernel sources. Just Googling `[architecture] syscall table` is perhaps the easiest.
+__NB!__ By default, the script uses libc to resolve the right syscall number for `memfd_create` on the target. If this fails (old or unsupported libc), you should specify the syscall number manually (this is different for most architectures). You need to search for `memfd_create` in your target's architecture's syscall table. This is located in various places in the Linux kernel sources. Just Googling `[architecture] syscall table` is perhaps the easiest.
 
 If you need to change the syscall number, use the `--syscall` flag (`-s`).
 
@@ -62,7 +60,7 @@ optional arguments:
   -h, --help            show this help message and exit
   -s NUM, --syscall NUM
                         syscall number for memfd_create for the target
-                        platform (default: 319)
+                        platform (default: resolve symbol via libc)
   -a ARGV, --argv ARGV  space-separated arguments (including argv[0]) supplied
                         to execle (default: path to file as argv[0])
   -c, --with-command    wrap the generated code in a call to Python, for

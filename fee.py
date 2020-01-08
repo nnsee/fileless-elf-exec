@@ -13,11 +13,12 @@ class CodeGenerator():
         self.output = ""
         self.zCompressionLevel = 9
         self.wrap = 0
+        self.syscall = None
 
-    def generate(self, elf: bytes, syscall: int, argv: str) -> str:
+    def generate(self, elf: bytes, argv: str) -> str:
         self.add_header()
         self.add_elf(elf)
-        self.add_dump_elf(syscall)
+        self.add_dump_elf()
         self.add_call_elf(argv)
         return self.output
     
@@ -31,7 +32,10 @@ class CodeGenerator():
     def add_header(self):
         self.add("import ctypes, os, base64, zlib")
         self.add("l = ctypes.CDLL(None)")
-        self.add("s = l.syscall")
+        if self.syscall:
+            self.add("s = l.syscall")
+        else:
+            self.add("s = l.memfd_create")
 
     def add_elf(self, elf: bytes):
         compressed_elf = zlib.compress(elf, self.zCompressionLevel)
@@ -46,8 +50,11 @@ class CodeGenerator():
         self.add(f"c = base64.b64decode(\n{encoded}\n)")
         self.add(f"e = zlib.decompress(c)")
     
-    def add_dump_elf(self, syscall: int):
-        self.add(f"f = s({syscall}, '', 1)")
+    def add_dump_elf(self):
+        if self.syscall:
+            self.add(f"f = s({self.syscall}, '', 1)")
+        else:
+            self.add("f = s('', 1)")
         self.add("os.write(f, e)")
     
     def add_call_elf(self, argv: str):
@@ -71,7 +78,7 @@ if __name__ == "__main__":
     parser.add_argument('path', type=argparse.FileType("rb"), 
       help="path to the ELF file")
     parser.add_argument('-s', '--syscall', metavar='NUM', type=int, 
-      help="syscall number for memfd_create for the target platform (default: 319)", default=319)
+      help="syscall number for memfd_create for the target platform (default: resolve symbol via libc)")
     parser.add_argument('-a', '--argv',
       help="space-separated arguments (including argv[0]) supplied to execle (default: path to file as argv[0])")
     parser.add_argument('-c', '--with-command', action='store_true',
@@ -95,8 +102,9 @@ if __name__ == "__main__":
 
     CG.zCompressionLevel = args.compression_level
     CG.wrap = args.wrap
+    CG.syscall = args.syscall
 
-    out = CG.generate(elf, args.syscall, argv)
+    out = CG.generate(elf, argv)
     if args.with_command:
         out = CG.with_command(args.python_path)
     
