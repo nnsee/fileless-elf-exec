@@ -12,6 +12,7 @@ class CodeGenerator():
     def __init__(self):
         self.output = ""
         self.zCompressionLevel = 9
+        self.wrap = 0
 
     def generate(self, elf: bytes, syscall: int, argv: str) -> str:
         self.add_header()
@@ -34,8 +35,15 @@ class CodeGenerator():
 
     def add_elf(self, elf: bytes):
         compressed_elf = zlib.compress(elf, self.zCompressionLevel)
-        encoded = b64encode(compressed_elf)
-        self.add(f"c = base64.b64decode({encoded})")
+        encoded = f"{b64encode(compressed_elf)}"
+
+        # wrap if necessary
+        if self.wrap > 3:
+            chars = self.wrap - 3 # two quotes and byte literal identifier
+            length = len(encoded)
+            encoded = "'\nb'".join(encoded[i:i+chars] for i in range(0, length, chars))
+
+        self.add(f"c = base64.b64decode(\n{encoded}\n)")
         self.add(f"e = zlib.decompress(c)")
     
     def add_dump_elf(self, syscall: int):
@@ -70,6 +78,8 @@ if __name__ == "__main__":
       help="wrap the generated code in a call to Python, for piping directly into ssh")
     parser.add_argument('-p', '--python-path', metavar='PATH', default='/usr/bin/env python3',
       help="path to python on target if '-c' is used (default: '/usr/bin/env python3')")
+    parser.add_argument('-w', '--wrap', metavar='CHARS', type=int,
+      help="when base64-encoding the elf, how many characters to wrap to a newline (default: 0)", default=0)
     parser.add_argument('-z', '--compression-level', metavar='LEVEL', type=int,
       help="zlib compression level, 0-9 (default: 9)", choices=range(0, 10), default=9)
     args = parser.parse_args()
@@ -82,7 +92,9 @@ if __name__ == "__main__":
     args.path.close()
     
     CG = CodeGenerator()
+
     CG.zCompressionLevel = args.compression_level
+    CG.wrap = args.wrap
 
     out = CG.generate(elf, args.syscall, argv)
     if args.with_command:

@@ -32,6 +32,11 @@ If you want to pipe over ssh, use the `--with-command` flag (`-c`) to wrap the o
 $ ./fee.py -c /path/to/binary | ssh user@target
 ``` 
 
+When piping over ssh, you sometimes want to wrap the long line which holds the base64-encoded version of the binary, as some shells do not like super long input strings. You can accomplish this with the `--wrap` flag (`-w`):
+```
+$ ./fee.py -c /path/to/binary -w 64 | ssh user@target
+```
+
 If you want to customise the arguments, use the `--argv` flag (`-a`):
 
 ```console
@@ -46,7 +51,7 @@ If you need to change the syscall number, use the `--syscall` flag (`-s`).
 
 Full help text:
 ```
-usage: fee.py [-h] [-s NUM] [-a ARGV] [-c] [-p PATH] [-z LEVEL] path
+usage: fee.py [-h] [-s NUM] [-a ARGV] [-c] [-p PATH] [-w CHARS] [-z LEVEL] path
 
 Print Python code to stdout to execute an ELF without dropping files.
 
@@ -65,7 +70,9 @@ optional arguments:
   -p PATH, --python-path PATH
                         path to python on target if '-c' is used (default:
                         '/usr/bin/env python3')
+  -w CHARS, --wrap CHARS
+                        when base64-encoding the elf, how many characters to
+                        wrap to a newline (default: 0)
   -z LEVEL, --compression-level LEVEL
                         zlib compression level, 0-9 (default: 9)
-
 ```
