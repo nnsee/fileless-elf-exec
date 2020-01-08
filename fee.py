@@ -17,6 +17,7 @@ def print_help(parser):
 class CodeGenerator():
     def __init__(self):
         self.output = ""
+        self.zCompressionLevel = 9
 
     def generate(self, elf: bytes, syscall: int, argv: str) -> str:
         self.add_header()
@@ -38,7 +39,7 @@ class CodeGenerator():
         self.add("s = l.syscall")
 
     def add_elf(self, elf: bytes):
-        compressed_elf = zlib.compress(elf, 9)
+        compressed_elf = zlib.compress(elf, self.zCompressionLevel)
         encoded = b64encode(compressed_elf)
         self.add(f"c = base64.b64decode({encoded})")
         self.add(f"e = zlib.decompress(c)")
@@ -68,8 +69,10 @@ if __name__ == "__main__":
       help="space-separated arguments (including argv[0]) supplied to execle (default: path to file as argv[0])")
     parser.add_argument('-c', '--with-command', action='store_true',
       help="wrap the generated code in a call to Python, for piping directly into ssh")
-    parser.add_argument('-p', '--python-path', metavar='PYPATH', default='/usr/bin/env python3',
+    parser.add_argument('-p', '--python-path', metavar='PATH', default='/usr/bin/env python3',
       help="path to python on target if '-c' is used (default: '/usr/bin/env python3')")
+    parser.add_argument('-z', '--compression-level', metavar='LEVEL', type=int,
+      help="zlib compression level, 0-9 (default: 9)", choices=range(0, 10), default=9)
     args = parser.parse_args()
 
     if args.help:
@@ -84,6 +87,8 @@ if __name__ == "__main__":
     args.path.close()
     
     CG = CodeGenerator()
+    CG.zCompressionLevel = args.compression_level
+    
     out = CG.generate(elf, args.syscall, argv)
     if args.with_command:
         out = CG.with_command(args.python_path)

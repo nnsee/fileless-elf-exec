@@ -46,7 +46,7 @@ If you need to change the syscall number, use the `--syscall` flag (`-s`).
 
 Full help text:
 ```
-usage: fee.py [-h] [-s NUM] [-a ARGV] [-c] [-p PYPATH] path
+usage: fee.py [-h] [-s NUM] [-a ARGV] [-c] [-p PATH] [-z LEVEL] path
 
 Print Python code to stdout to execute an ELF without dropping files.
 
@@ -62,8 +62,10 @@ optional arguments:
                         to execle (default: path to file as argv[0])
   -c, --with-command    wrap the generated code in a call to Python, for
                         piping directly into ssh
-  -p PYPATH, --python-path PYPATH
+  -p PATH, --python-path PATH
                         path to python on target if '-c' is used (default:
                         '/usr/bin/env python3')
+  -z LEVEL, --compression-level LEVEL
+                        zlib compression level, 0-9 (default: 9)
 
 ```
