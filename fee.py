@@ -33,11 +33,14 @@ class CodeGenerator():
         self.add("import ctypes, os, base64, zlib")
         self.add("l = ctypes.CDLL(None)")
         if self.syscall:
-            self.add("s = l.syscall")
+            self.add("s = l.syscall") # we specify the syscall manually
         else:
-            self.add("s = l.memfd_create")
+            self.add("s = l.memfd_create") # dynamic
 
     def add_elf(self, elf: bytes):
+        # compress the binary and encode it with base64
+        # base64 is required so we don't put any funky characters in an 
+        # otherwise human-readable script
         compressed_elf = zlib.compress(elf, self.zCompressionLevel)
         encoded = f"{b64encode(compressed_elf)}"
 
@@ -51,6 +54,7 @@ class CodeGenerator():
         self.add(f"e = zlib.decompress(c)")
     
     def add_dump_elf(self):
+        # we create the fd with no name
         if self.syscall:
             self.add(f"f = s({self.syscall}, '', 1)")
         else:
@@ -60,8 +64,8 @@ class CodeGenerator():
     def add_call_elf(self, argv: str):
         self.add(f"c = '/proc/self/fd/%d' % f")
         args = argv.strip()
-        args = args.replace("'", "\\'")
-        args = args.replace(" ", "', '")
+        args = args.replace("'", "\\'") # escape single quotes, we use them
+        args = args.replace(" ", "', '") # split argv into separate words
         self.add(f"os.execle(c, '{args}', {{}})")
 
 if __name__ == "__main__":
@@ -73,12 +77,28 @@ if __name__ == "__main__":
     
     argparse._HelpAction.__call__ = patched_help_call
 
+    # map of memfd_create syscall numbers for different architectures
+    syscall_numbers = {
+        **dict.fromkeys(['386'], 356), 
+        **dict.fromkeys(['amd64'], 319),
+        **dict.fromkeys(['arm'], 385),
+        **dict.fromkeys(['arm64', 'riscv64'], 279),
+        **dict.fromkeys(['mips'], 4354),
+        **dict.fromkeys(['mips64', 'mips64le'], 5314),
+        **dict.fromkeys(['ppc', 'ppc64'], 360),
+        **dict.fromkeys(['s390x'], 350),
+        **dict.fromkeys(['sparc64'], 348),
+    }
+
     parser = argparse.ArgumentParser(
-        description="Print Python code to stdout to execute an ELF without dropping files.")
+      description="Print Python code to stdout to execute an ELF without dropping files.")
     parser.add_argument('path', type=argparse.FileType("rb"), 
       help="path to the ELF file")
-    parser.add_argument('-s', '--syscall', metavar='NUM', type=int, 
-      help="syscall number for memfd_create for the target platform (default: resolve symbol via libc)")
+    arch_or_syscall_group = parser.add_mutually_exclusive_group()
+    arch_or_syscall_group.add_argument('-t', '--target-architecture', metavar='ARCH',
+      help="target platform for resolving memfd_create (default: resolve symbol via libc)", choices=syscall_numbers)
+    arch_or_syscall_group.add_argument('-s', '--syscall', metavar='NUM', type=int, 
+      help="syscall number for memfd_create for the target platform")
     parser.add_argument('-a', '--argv',
       help="space-separated arguments (including argv[0]) supplied to execle (default: path to file as argv[0])")
     parser.add_argument('-c', '--with-command', action='store_true',
@@ -93,19 +113,27 @@ if __name__ == "__main__":
 
     argv = args.argv
     if not argv:
+        # argv not specified, so let's just call it with the path on the host
         argv = args.path.name
     
+    if args.target_architecture:
+        # map to syscall number
+        syscall = syscall_numbers.get(args.target_architecture)
+    else:
+        syscall = args.syscall # None if not specified, which is fine
+    
+    # read the elf
     elf = args.path.read()
     args.path.close()
     
     CG = CodeGenerator()
 
-    CG.zCompressionLevel = args.compression_level
-    CG.wrap = args.wrap
-    CG.syscall = args.syscall
+    CG.zCompressionLevel = args.compression_level # defaults to 9
+    CG.wrap = args.wrap # defaults to 0, no wrap
+    CG.syscall = syscall
 
     out = CG.generate(elf, argv)
     if args.with_command:
         out = CG.with_command(args.python_path)
     
-    print(out)
+    print(out) # does print() always print to stdout?
