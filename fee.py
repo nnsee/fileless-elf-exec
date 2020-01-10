@@ -137,4 +137,6 @@ if __name__ == "__main__":
     if args.with_command:
         out = CG.with_command(args.python_path)
     
-    print(out) # does print() always print to stdout?
+    # explicitly write to stdout
+    sys.stdout.write(out)
+    sys.stdout.flush() 
