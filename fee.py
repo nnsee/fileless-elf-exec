@@ -9,6 +9,14 @@ import argparse
 import sys
 import zlib
 
+def printOut(what: str):
+    sys.stdout.write(what)
+    sys.stdout.flush()
+
+def printErr(what: str):
+    sys.stderr.write(what)
+    sys.stderr.flush()
+
 class CodeGenerator():
     def __init__(self):
         self.output = ""
@@ -123,6 +131,9 @@ if __name__ == "__main__":
     else:
         syscall = args.syscall # None if not specified, which is fine
     
+    if args.python_path and not args.with_command:
+        printErr("note: '-p' flag meaningless without '-c'\n")
+
     # read the elf
     elf = args.path.read()
     args.path.close()
@@ -138,5 +149,4 @@ if __name__ == "__main__":
         out = CG.with_command(args.python_path)
     
     # explicitly write to stdout
-    sys.stdout.write(out)
-    sys.stdout.flush() 
+    printOut(out)
