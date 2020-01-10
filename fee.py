@@ -4,6 +4,7 @@
 # for license, check LICENSE file
 
 from base64 import b64encode
+import os.path
 import argparse
 import sys
 import zlib
@@ -113,8 +114,8 @@ if __name__ == "__main__":
 
     argv = args.argv
     if not argv:
-        # argv not specified, so let's just call it with the path on the host
-        argv = args.path.name
+        # argv not specified, so let's just call it with the basename on the host
+        argv = os.path.basename(args.path.name)
     
     if args.target_architecture:
         # map to syscall number
