@@ -25,9 +25,21 @@ class CodeGenerator():
         self._meta = self._Python
         self._generator = None
     
+    def _prepare_elf(self, elf: bytes):
+        # compress the binary and encode it with base64
+        # base64 is required so we don't put any funky characters in an 
+        # otherwise human-readable script
+        compressed_elf = zlib.compress(elf, self.zCompressionLevel)
+        encoded = b64encode(compressed_elf)
+
+        return encoded
+    
     def set_lang(self, lang: str):
-        if lang.lower() in ["py", "python"]:
+        lang = lang.lower()
+        if lang in ["py", "python"]:
             self._meta = self._Python
+        elif lang in ["pl", "perl"]:
+            self._meta = self._Perl
         else:
             raise LanguageNotImplementedException(f"Language '{lang}' is not implemented")
 
@@ -41,7 +53,7 @@ class CodeGenerator():
     
     def with_command(self, **kwargs):
         if not self._generator:
-            raise NotGeneratedException("Code not yet generated.")
+            raise GeneratorException("Code not yet generated")
 
         if kwargs.get("path") is None:
             # this is stupid
@@ -49,11 +61,61 @@ class CodeGenerator():
 
         return self._generator.with_command(**kwargs)
     
+    class _Perl():
+        # Perl generator metaclass
+        def __init__(self, outer):
+            self.output = ""
+            self.prep_elf = outer._prepare_elf
+            self.wrap = outer.wrap
+            if not outer.syscall:
+                raise GeneratorException("Perl generator requires the syscall number")
+            self.syscall = outer.syscall
+        
+        def with_command(self, path="/usr/bin/env perl"):
+            escaped = self.output.replace('"', '\\"')
+            escaped = escaped.replace('$', '\\$')
+            return f'{path} -e "{escaped}"'
+        
+        def add(self, line: str):
+            self.output += f"{line};\n"
+        
+        def add_header(self):
+            self.add("use MIME::Base64")
+            self.add("use Compress::Zlib")
+
+        def add_elf(self, elf: bytes):
+            # prepare elf
+            encoded = self.prep_elf(elf).decode('ascii')
+
+            # wrap if necessary
+            if self.wrap > 3:
+                chars = self.wrap - 3 # two quotes and concat operator
+                length = len(encoded)
+                encoded = "'.\n'".join(encoded[i:i+chars] for i in range(0, length, chars))
+            
+            self.add(f"$c = decode_base64(''.\n'{encoded}')")
+            self.add("$e = uncompress($c)")
+
+        def add_dump_elf(self):
+            # we create the fd with no name
+            self.add("$n = ''")
+            self.add(f"$f = syscall({self.syscall}, $n, 1)")
+            self.add("open($h, '>&='.$f) or die")
+            self.add("select((select($h), $|=1)[0])")
+            self.add("print $h $e")
+        
+        def add_call_elf(self, argv: str):
+            self.add('$p = "/proc/self/fd/$f"')
+            args = argv.strip()
+            args = args.replace("'", "\\'") # escape single quotes, we use them
+            args = args.replace(" ", "', '") # split argv into separate words
+            self.add(f"exec {{$p}} '{args}'")
+
     class _Python():
         # Python generator metaclass
         def __init__(self, outer):
             self.output = ""
-            self.zCompressionLevel = outer.zCompressionLevel
+            self.prep_elf = outer._prepare_elf
             self.wrap = outer.wrap
             self.syscall = outer.syscall
         
@@ -73,11 +135,8 @@ class CodeGenerator():
                 self.add("s = l.memfd_create") # dynamic
 
         def add_elf(self, elf: bytes):
-            # compress the binary and encode it with base64
-            # base64 is required so we don't put any funky characters in an 
-            # otherwise human-readable script
-            compressed_elf = zlib.compress(elf, self.zCompressionLevel)
-            encoded = f"{b64encode(compressed_elf)}"
+            # prepare elf
+            encoded = f"{self.prep_elf(elf)}"
 
             # wrap if necessary
             if self.wrap > 3:
@@ -86,7 +145,7 @@ class CodeGenerator():
                 encoded = "'\nb'".join(encoded[i:i+chars] for i in range(0, length, chars))
 
             self.add(f"c = base64.b64decode(\n{encoded}\n)")
-            self.add(f"e = zlib.decompress(c)")
+            self.add("e = zlib.decompress(c)")
 
         def add_dump_elf(self):
             # we create the fd with no name
@@ -97,16 +156,16 @@ class CodeGenerator():
             self.add("os.write(f, e)")
 
         def add_call_elf(self, argv: str):
-            self.add(f"c = '/proc/self/fd/%d' % f")
+            self.add(f"p = '/proc/self/fd/%d' % f")
             args = argv.strip()
             args = args.replace("'", "\\'") # escape single quotes, we use them
             args = args.replace(" ", "', '") # split argv into separate words
-            self.add(f"os.execle(c, '{args}', {{}})")
+            self.add(f"os.execle(p, '{args}', {{}})")
 
 class LanguageNotImplementedException(Exception):
     pass
 
-class NotGeneratedException(Exception):
+class GeneratorException(Exception):
     pass
 
 if __name__ == "__main__":
@@ -178,16 +237,17 @@ if __name__ == "__main__":
     CG.wrap = args.wrap # defaults to 0, no wrap
     CG.syscall = syscall
 
-    if args.language:
-        try:
+    try:
+        if args.language:
             CG.set_lang(args.language)
-        except LanguageNotImplementedException as e:
-            printErr(f"{e.__str__()}\n")
-            sys.exit(1)
 
-    out = CG.generate(elf, argv)
-    if args.with_command:
-        out = CG.with_command(path=args.interpreter_path)
-    
-    # explicitly write to stdout
-    printOut(out)
+        out = CG.generate(elf, argv)
+        if args.with_command:
+            out = CG.with_command(path=args.interpreter_path)
+
+        # explicitly write to stdout
+        printOut(out)
+    except Exception as e:
+        printErr(f"{e.__str__()}\n")
+        printErr("Use --help for more information.\n")
+        sys.exit(1)
