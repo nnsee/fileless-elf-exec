@@ -57,7 +57,7 @@ class CodeGenerator():
             self.wrap = outer.wrap
             self.syscall = outer.syscall
         
-        def with_command(self, path="/usr/bin/env python3"):
+        def with_command(self, path="/usr/bin/env python"):
             escaped = self.output.replace('"', '\\"')
             return f'{path} -c "{escaped}"'
 

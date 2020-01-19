@@ -69,7 +69,8 @@ optional arguments:
   -p PATH, --interpreter-path PATH
                         path to interpreter on target if '-c' is used, otherwise a sane default is used
   -w CHARS, --wrap CHARS
-                        when base64-encoding the elf, how many characters to wrap to a newline (default: 0)
+                        when base64-encoding the elf, how many characters to wrap to a newline (default: 
+                        0)
   -z LEVEL, --compression-level LEVEL
                         zlib compression level, 0-9 (default: 9)
 ```
