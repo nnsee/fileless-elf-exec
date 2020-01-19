@@ -48,9 +48,9 @@ For more exotic platforms, you should specify the syscall number manually. You n
 
 Full help text:
 ```
-usage: fee.py [-h] [-t ARCH | -s NUM] [-a ARGV] [-c] [-p PATH] [-w CHARS] [-z LEVEL] path
+usage: fee.py [-h] [-t ARCH | -s NUM] [-a ARGV] [-l LANG] [-c] [-p PATH] [-w CHARS] [-z LEVEL] path
 
-Print Python code to stdout to execute an ELF without dropping files.
+Print code to stdout to execute an ELF without dropping files.
 
 positional arguments:
   path                  path to the ELF file
@@ -58,19 +58,18 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   -t ARCH, --target-architecture ARCH
-                        target platform for resolving memfd_create (default: resolve symbol via
-                        libc)
+                        target platform for resolving memfd_create (default: resolve symbol via libc)
   -s NUM, --syscall NUM
                         syscall number for memfd_create for the target platform
-  -a ARGV, --argv ARGV  space-separated arguments (including argv[0]) supplied to execle (default:
-                        path to file as argv[0])
-  -c, --with-command    wrap the generated code in a call to Python, for piping directly into ssh
-  -p PATH, --python-path PATH
-                        path to python on target if '-c' is used (default: '/usr/bin/env python3')
+  -a ARGV, --argv ARGV  space-separated arguments (including argv[0]) supplied to execle (default: path to
+                        file as argv[0])
+  -l LANG, --language LANG
+                        language for the generated code (default: python)
+  -c, --with-command    wrap the generated code in a call to an interpreter, for piping directly into ssh
+  -p PATH, --interpreter-path PATH
+                        path to interpreter on target if '-c' is used, otherwise a sane default is used
   -w CHARS, --wrap CHARS
-                        when base64-encoding the elf, how many characters to wrap to a newline
-                        (default: 0)
+                        when base64-encoding the elf, how many characters to wrap to a newline (default: 0)
   -z LEVEL, --compression-level LEVEL
                         zlib compression level, 0-9 (default: 9)
-
 ```
