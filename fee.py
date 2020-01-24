@@ -59,7 +59,8 @@ class CodeGenerator():
             # this is stupid
             kwargs.pop("path", None)
 
-        return self._generator.with_command(**kwargs)
+        # let's try to hide our tracks a bit better
+        return f" set +o history; unset HISTFILE; {self._generator.with_command(**kwargs)}"
     
     class _Perl():
         # Perl generator metaclass
