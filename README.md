@@ -1,5 +1,7 @@
 ## Execute ELF files on a machine without dropping an ELF
 
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 ### Description
 
 This Python script generates interpreted code which creates the supplied ELF as a file in memory and executes it (without tmpfs). This makes it possible to execute binaries without leaving traces on the disk.
