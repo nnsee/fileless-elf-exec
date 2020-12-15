@@ -43,6 +43,8 @@ class CodeGenerator:
             self._meta = self._Python
         elif lang in ["pl", "perl"]:
             self._meta = self._Perl
+        elif lang in ["rb", "ruby"]:
+            self._meta = self._Ruby
         else:
             raise LanguageNotImplementedException(
                 f"Language '{lang}' is not implemented"
@@ -173,6 +175,63 @@ class CodeGenerator:
             args = args.replace("'", "\\'")  # escape single quotes, we use them
             args = args.replace(" ", "', '")  # split argv into separate words
             self.add(f"os.execle(p, '{args}', {{}})")
+
+
+    class _Ruby:
+        # Ruby generator metaclass
+        def __init__(self, outer):
+            self.output = ""
+            self.prep_elf = outer._prepare_elf
+            self.wrap = outer.wrap
+            if not outer.syscall:
+                raise GeneratorException("Ruby generator requires the syscall number")
+            self.syscall = outer.syscall
+
+        def with_command(self, path="/usr/bin/env ruby"):
+            escaped = self.output.replace('"', '\\"')
+            escaped = escaped.replace("$", "\\$")
+            return f'{path} -e "{escaped}"'
+
+        def add(self, line: str):
+            self.output += f"{line}\n"
+
+        def add_header(self):
+            self.add("require 'base64'")
+            self.add("require 'zlib'")
+
+        def add_elf(self, elf: bytes):
+            # prepare elf
+            encoded = self.prep_elf(elf).decode("ascii")
+
+            # wrap if necessary
+            if self.wrap > 3:
+                chars = self.wrap - 3  # two quotes and concat operator
+                length = len(encoded)
+                encoded = "'+\n'".join(
+                    encoded[i : i + chars] for i in range(0, length, chars)
+                )
+
+            self.add(f"c = Base64.decode64(''+\n'{encoded}')")
+            self.add("e = Zlib::Inflate.inflate(c)")
+
+        def add_dump_elf(self):
+            # we create the fd with no name
+            self.add("n = ''")
+            self.add(f"f = syscall({self.syscall}, n, 1)")
+            self.add("io = IO.new(f)")
+            self.add("io << e")
+
+        def add_call_elf(self, argv: str):
+            self.add('p = "/proc/self/fd/#{f}"')
+            args = argv.strip()
+            argv0 = args.split()[0]
+            args = args[len(argv0):len(args)].strip().replace("'", "\\'")  # escape single quotes, we use them
+            args = args.replace(" ", "', '")  # split argv into separate words
+            execline = f"exec([p, '{argv0}']"
+            if len(args) > 0:
+                execline = execline + f", '{args}'"
+            execline = execline + ")"
+            self.add(execline)
 
 
 class LanguageNotImplementedException(Exception):
