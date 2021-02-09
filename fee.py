@@ -3,11 +3,11 @@
 # written-by: neonsea 2020
 # for license, check LICENSE file
 
-from base64 import b64encode
-import os.path
 import argparse
+import os.path
 import sys
 import zlib
+from base64 import b64encode
 
 
 def printOut(what: str):
@@ -176,7 +176,6 @@ class CodeGenerator:
             args = args.replace(" ", "', '")  # split argv into separate words
             self.add(f"os.execle(p, '{args}', {{}})")
 
-
     class _Ruby:
         # Ruby generator metaclass
         def __init__(self, outer):
@@ -225,7 +224,9 @@ class CodeGenerator:
             self.add('p = "/proc/self/fd/#{f}"')
             args = argv.strip()
             argv0 = args.split()[0]
-            args = args[len(argv0):len(args)].strip().replace("'", "\\'")  # escape single quotes, we use them
+            args = (
+                args[len(argv0) : len(args)].strip().replace("'", "\\'")
+            )  # escape single quotes, we use them
             args = args.replace(" ", "', '")  # split argv into separate words
             execline = f"exec([p, '{argv0}']"
             if len(args) > 0:
