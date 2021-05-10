@@ -1,34 +1,46 @@
 #!/usr/bin/env python3
 
-# written-by: neonsea 2020
+# written-by: neonsea 2021
 # for license, check LICENSE file
 
 import argparse
 import os.path
+import struct
 import sys
 import zlib
 from base64 import b64encode
 
 
-def printOut(what: str):
+def printOut(what: str) -> None:
     sys.stdout.write(what)
     sys.stdout.flush()
 
 
-def printErr(what: str):
+def printErr(what: str) -> None:
     sys.stderr.write(what)
     sys.stderr.flush()
 
 
+def _get_e_machine(header: bytes) -> int:
+    if header[0x05] == 1:
+        endianness = "<"
+    else:
+        endianness = ">"
+
+    _, machine = struct.unpack(f"{endianness}16xHH", header)
+
+    return machine
+
+
 class CodeGenerator:
-    def __init__(self):
+    def __init__(self) -> None:
         self.zCompressionLevel = 9
         self.wrap = 0
         self.syscall = None
         self._meta = self._Python
         self._generator = None
 
-    def _prepare_elf(self, elf: bytes):
+    def _prepare_elf(self, elf: bytes) -> bytes:
         # compress the binary and encode it with base64
         # base64 is required so we don't put any funky characters in an
         # otherwise human-readable script
@@ -37,7 +49,7 @@ class CodeGenerator:
 
         return encoded
 
-    def set_lang(self, lang: str):
+    def set_lang(self, lang: str) -> None:
         lang = lang.lower()
         if lang in ["py", "python"]:
             self._meta = self._Python
@@ -58,7 +70,7 @@ class CodeGenerator:
         self._generator.add_call_elf(argv)
         return self._generator.output
 
-    def with_command(self, **kwargs):
+    def with_command(self, **kwargs) -> str:
         if not self._generator:
             raise GeneratorException("Code not yet generated")
 
@@ -73,27 +85,27 @@ class CodeGenerator:
 
     class _Perl:
         # Perl generator metaclass
-        def __init__(self, outer):
+        def __init__(self, outer) -> None:
             self.output = ""
             self.prep_elf = outer._prepare_elf
             self.wrap = outer.wrap
             if not outer.syscall:
-                raise GeneratorException("Perl generator requires the syscall number")
+                raise GeneratorException("Perl generator cannot resolve the syscall using libc, specify a target architecture")
             self.syscall = outer.syscall
 
-        def with_command(self, path="/usr/bin/env perl"):
+        def with_command(self, path="/usr/bin/env perl") -> str:
             escaped = self.output.replace('"', '\\"')
             escaped = escaped.replace("$", "\\$")
             return f'{path} -e "{escaped}"'
 
-        def add(self, line: str):
+        def add(self, line: str) -> None:
             self.output += f"{line};\n"
 
-        def add_header(self):
+        def add_header(self) -> None:
             self.add("use MIME::Base64")
             self.add("use Compress::Zlib")
 
-        def add_elf(self, elf: bytes):
+        def add_elf(self, elf: bytes) -> None:
             # prepare elf
             encoded = self.prep_elf(elf).decode("ascii")
 
@@ -108,7 +120,7 @@ class CodeGenerator:
             self.add(f"$c = decode_base64(''.\n'{encoded}')")
             self.add("$e = uncompress($c)")
 
-        def add_dump_elf(self):
+        def add_dump_elf(self) -> None:
             # we create the fd with no name
             self.add("$n = ''")
             self.add(f"$f = syscall({self.syscall}, $n, 1)")
@@ -116,7 +128,7 @@ class CodeGenerator:
             self.add("select((select($h), $|=1)[0])")
             self.add("print $h $e")
 
-        def add_call_elf(self, argv: str):
+        def add_call_elf(self, argv: str) -> None:
             self.add('$p = "/proc/self/fd/$f"')
             args = argv.strip()
             args = args.replace("'", "\\'")  # escape single quotes, we use them
@@ -125,20 +137,20 @@ class CodeGenerator:
 
     class _Python:
         # Python generator metaclass
-        def __init__(self, outer):
+        def __init__(self, outer) -> None:
             self.output = ""
             self.prep_elf = outer._prepare_elf
             self.wrap = outer.wrap
             self.syscall = outer.syscall
 
-        def with_command(self, path="/usr/bin/env python"):
+        def with_command(self, path="/usr/bin/env python") -> str:
             escaped = self.output.replace('"', '\\"')
             return f'{path} -c "{escaped}"'
 
-        def add(self, line: str):
+        def add(self, line: str) -> None:
             self.output += f"{line}\n"
 
-        def add_header(self):
+        def add_header(self) -> None:
             self.add("import ctypes, os, base64, zlib")
             self.add("l = ctypes.CDLL(None)")
             if self.syscall:
@@ -146,7 +158,7 @@ class CodeGenerator:
             else:
                 self.add("s = l.memfd_create")  # dynamic
 
-        def add_elf(self, elf: bytes):
+        def add_elf(self, elf: bytes) -> None:
             # prepare elf
             encoded = f"{self.prep_elf(elf)}"
 
@@ -161,7 +173,7 @@ class CodeGenerator:
             self.add(f"c = base64.b64decode(\n{encoded}\n)")
             self.add("e = zlib.decompress(c)")
 
-        def add_dump_elf(self):
+        def add_dump_elf(self) -> None:
             # we create the fd with no name
             if self.syscall:
                 self.add(f"f = s({self.syscall}, '', 1)")
@@ -169,7 +181,7 @@ class CodeGenerator:
                 self.add("f = s('', 1)")
             self.add("os.write(f, e)")
 
-        def add_call_elf(self, argv: str):
+        def add_call_elf(self, argv: str) -> None:
             self.add(f"p = '/proc/self/fd/%d' % f")
             args = argv.strip()
             args = args.replace("'", "\\'")  # escape single quotes, we use them
@@ -178,27 +190,27 @@ class CodeGenerator:
 
     class _Ruby:
         # Ruby generator metaclass
-        def __init__(self, outer):
+        def __init__(self, outer) -> None:
             self.output = ""
             self.prep_elf = outer._prepare_elf
             self.wrap = outer.wrap
             if not outer.syscall:
-                raise GeneratorException("Ruby generator requires the syscall number")
+                raise GeneratorException("Ruby generator cannot resolve the syscall using libc, specify a target architecture")
             self.syscall = outer.syscall
 
-        def with_command(self, path="/usr/bin/env ruby"):
+        def with_command(self, path="/usr/bin/env ruby") -> str:
             escaped = self.output.replace('"', '\\"')
             escaped = escaped.replace("$", "\\$")
             return f'{path} -e "{escaped}"'
 
-        def add(self, line: str):
+        def add(self, line: str) -> None:
             self.output += f"{line}\n"
 
-        def add_header(self):
+        def add_header(self) -> None:
             self.add("require 'base64'")
             self.add("require 'zlib'")
 
-        def add_elf(self, elf: bytes):
+        def add_elf(self, elf: bytes) -> None:
             # prepare elf
             encoded = self.prep_elf(elf).decode("ascii")
 
@@ -213,14 +225,14 @@ class CodeGenerator:
             self.add(f"c = Base64.decode64(''+\n'{encoded}')")
             self.add("e = Zlib::Inflate.inflate(c)")
 
-        def add_dump_elf(self):
+        def add_dump_elf(self) -> None:
             # we create the fd with no name
             self.add("n = ''")
             self.add(f"f = syscall({self.syscall}, n, 1)")
             self.add("io = IO.new(f)")
             self.add("io << e")
 
-        def add_call_elf(self, argv: str):
+        def add_call_elf(self, argv: str) -> None:
             self.add('p = "/proc/self/fd/#{f}"')
             args = argv.strip()
             argv0 = args.split()[0]
@@ -253,16 +265,18 @@ if __name__ == "__main__":
     argparse._HelpAction.__call__ = patched_help_call
 
     # map of memfd_create syscall numbers for different architectures
+    # also includes e_machine numbers
     syscall_numbers = {
-        **dict.fromkeys(["386"], 356),
-        **dict.fromkeys(["amd64"], 319),
-        **dict.fromkeys(["arm"], 385),
-        **dict.fromkeys(["arm64", "riscv64"], 279),
-        **dict.fromkeys(["mips"], 4354),
-        **dict.fromkeys(["mips64", "mips64le"], 5314),
-        **dict.fromkeys(["ppc", "ppc64"], 360),
-        **dict.fromkeys(["s390x"], 350),
-        **dict.fromkeys(["sparc64"], 348),
+        **dict.fromkeys(["autodetect", "libc"], -1),
+        **dict.fromkeys(["386", 3], 356),
+        **dict.fromkeys(["amd64", 62], 319),
+        **dict.fromkeys(["arm", 40], 385),
+        **dict.fromkeys(["arm64", "riscv64", 183], 279),
+        **dict.fromkeys(["mips", 8], 4354),
+        **dict.fromkeys(["mips64", "mips64le", 8], 5314),
+        **dict.fromkeys(["ppc", "ppc64", 20], 360),
+        **dict.fromkeys(["s390x", 22], 350),
+        **dict.fromkeys(["sparc64", 2, 18, 43], 348),
     }
 
     parser = argparse.ArgumentParser(
@@ -276,8 +290,9 @@ if __name__ == "__main__":
         "-t",
         "--target-architecture",
         metavar="ARCH",
-        help="target platform for resolving memfd_create (default: resolve symbol via libc)",
-        choices=syscall_numbers,
+        help="target platform for resolving memfd_create (default: detect from ELF)",
+        choices=[k for k in syscall_numbers if type(k) == str],
+        default="autodetect",
     )
     arch_or_syscall_group.add_argument(
         "-s",
@@ -333,12 +348,6 @@ if __name__ == "__main__":
         # argv not specified, so let's just call it with the basename on the host
         argv = os.path.basename(args.path.name)
 
-    if args.target_architecture:
-        # map to syscall number
-        syscall = syscall_numbers.get(args.target_architecture)
-    else:
-        syscall = args.syscall  # None if not specified
-
     if args.interpreter_path and not args.with_command:
         printErr("note: '-p' flag meaningless without '-c'\n")
 
@@ -350,6 +359,16 @@ if __name__ == "__main__":
 
     CG.zCompressionLevel = args.compression_level  # defaults to 9
     CG.wrap = args.wrap  # defaults to 0, no wrap
+
+    if args.target_architecture == "autodetect":
+        args.target_architecture = _get_e_machine(elf[:20])
+
+    if args.target_architecture != "libc":
+        # map to syscall number
+        syscall = syscall_numbers.get(args.target_architecture)
+    else:
+        syscall = args.syscall  # None if not specified
+
     CG.syscall = syscall
 
     try:
