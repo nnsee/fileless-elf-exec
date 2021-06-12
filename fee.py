@@ -11,12 +11,12 @@ import zlib
 from base64 import b64encode
 
 
-def printOut(what: str) -> None:
+def print_out(what: str) -> None:
     sys.stdout.write(what)
     sys.stdout.flush()
 
 
-def printErr(what: str) -> None:
+def print_err(what: str) -> None:
     sys.stderr.write(what)
     sys.stderr.flush()
 
@@ -349,7 +349,7 @@ if __name__ == "__main__":
         argv = os.path.basename(args.path.name)
 
     if args.interpreter_path and not args.with_command:
-        printErr("note: '-p' flag meaningless without '-c'\n")
+        print_err("note: '-p' flag meaningless without '-c'\n")
 
     # read the elf
     elf = args.path.read()
@@ -380,8 +380,8 @@ if __name__ == "__main__":
             out = CG.with_command(path=args.interpreter_path)
 
         # explicitly write to stdout
-        printOut(out)
+        print_out(out)
     except Exception as e:
-        printErr(f"{e.__str__()}\n")
-        printErr("Use --help for more information.\n")
+        print_err(f"{e.__str__()}\n")
+        print_err("Use --help for more information.\n")
         sys.exit(1)
