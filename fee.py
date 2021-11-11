@@ -251,15 +251,7 @@ class CodeGenerator:
             self.add(execline)
 
 
-class LanguageNotImplementedException(Exception):
-    pass
-
-
-class GeneratorException(Exception):
-    pass
-
-
-if __name__ == "__main__":
+def main() -> int:
     # we need to monkeypatch the help function to print to stderr
     # as we want nothing but executable code being printed to stdout
     def patched_help_call(self, parser, namespace, values, option_string=None):
@@ -388,4 +380,18 @@ if __name__ == "__main__":
     except Exception as e:
         print_err(f"{e.__str__()}\n")
         print_err("Use --help for more information.\n")
-        sys.exit(1)
+        return 1
+
+    return 0
+
+
+class LanguageNotImplementedException(Exception):
+    pass
+
+
+class GeneratorException(Exception):
+    pass
+
+
+if __name__ == "__main__":
+    sys.exit(main())
