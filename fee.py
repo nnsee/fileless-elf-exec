@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-# written-by: neonsea 2021
+# written-by: nns 2021
 # for license, check LICENSE file
+
+# pylint: disable=line-too-long
+# pylint: disable=missing-class-docstring
+# pylint: disable=missing-function-docstring
+# pylint: disable=missing-module-docstring
 
 import argparse
 import os.path
@@ -184,7 +190,7 @@ class CodeGenerator:
             self.add("os.write(f, e)")
 
         def add_call_elf(self, argv: str) -> None:
-            self.add(f"p = '/proc/self/fd/%d' % f")
+            self.add("p = '/proc/self/fd/%d' % f")
             args = argv.strip()
             args = args.replace("'", "\\'")  # escape single quotes, we use them
             args = args.replace(" ", "', '")  # split argv into separate words
@@ -254,11 +260,13 @@ class CodeGenerator:
 def main() -> int:
     # we need to monkeypatch the help function to print to stderr
     # as we want nothing but executable code being printed to stdout
-    def patched_help_call(self, parser, namespace, values, option_string=None):
+    def patched_help_call(
+        self, parser, namespace, values, option_string=None
+    ):  # pylint: disable=unused-argument
         parser.print_help(file=sys.stderr)
         parser.exit()
 
-    argparse._HelpAction.__call__ = patched_help_call
+    argparse._HelpAction.__call__ = patched_help_call  # pylint: disable=W0212
 
     # map of memfd_create syscall numbers for different architectures
     # also includes e_machine numbers
@@ -287,7 +295,7 @@ def main() -> int:
         "--target-architecture",
         metavar="ARCH",
         help="target platform for resolving memfd_create (default: detect from ELF)",
-        choices=[k for k in syscall_numbers if type(k) == str],
+        choices=[k for k in syscall_numbers if isinstance(k, str)],
         default="autodetect",
     )
     arch_or_syscall_group.add_argument(
@@ -351,10 +359,10 @@ def main() -> int:
     elf = args.path.read()
     args.path.close()
 
-    CG = CodeGenerator()
+    code_generator = CodeGenerator()
 
-    CG.compression_level = args.compression_level  # defaults to 9
-    CG.wrap = args.wrap  # defaults to 0, no wrap
+    code_generator.compression_level = args.compression_level  # defaults to 9
+    code_generator.wrap = args.wrap  # defaults to 0, no wrap
 
     if args.target_architecture == "autodetect":
         args.target_architecture = _get_e_machine(elf[:20])
@@ -365,20 +373,20 @@ def main() -> int:
     else:
         syscall = args.syscall  # None if not specified
 
-    CG.syscall = syscall
+    code_generator.syscall = syscall
 
     try:
         if args.language:
-            CG.set_lang(args.language)
+            code_generator.set_lang(args.language)
 
-        out = CG.generate(elf, argv)
+        out = code_generator.generate(elf, argv)
         if args.with_command:
-            out = CG.with_command(path=args.interpreter_path)
+            out = code_generator.with_command(path=args.interpreter_path)
 
         # explicitly write to stdout
         print_out(out)
-    except Exception as e:
-        print_err(f"{e.__str__()}\n")
+    except Exception as exception:  # pylint: disable=broad-except
+        print_err(f"{exception.__str__()}\n")
         print_err("Use --help for more information.\n")
         return 1
 
