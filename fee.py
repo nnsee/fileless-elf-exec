@@ -90,7 +90,9 @@ class CodeGenerator:
             self.prep_elf = outer._prepare_elf
             self.wrap = outer.wrap
             if not outer.syscall:
-                raise GeneratorException("Perl generator cannot resolve the syscall using libc, specify a target architecture")
+                raise GeneratorException(
+                    "Perl generator cannot resolve the syscall using libc, specify a target architecture"
+                )
             self.syscall = outer.syscall
 
         def with_command(self, path="/usr/bin/env perl") -> str:
@@ -195,7 +197,9 @@ class CodeGenerator:
             self.prep_elf = outer._prepare_elf
             self.wrap = outer.wrap
             if not outer.syscall:
-                raise GeneratorException("Ruby generator cannot resolve the syscall using libc, specify a target architecture")
+                raise GeneratorException(
+                    "Ruby generator cannot resolve the syscall using libc, specify a target architecture"
+                )
             self.syscall = outer.syscall
 
         def with_command(self, path="/usr/bin/env ruby") -> str:
