@@ -34,7 +34,7 @@ def _get_e_machine(header: bytes) -> int:
 
 class CodeGenerator:
     def __init__(self) -> None:
-        self.zCompressionLevel = 9
+        self.compression_level = 9
         self.wrap = 0
         self.syscall = None
         self._meta = self._Python
@@ -44,7 +44,7 @@ class CodeGenerator:
         # compress the binary and encode it with base64
         # base64 is required so we don't put any funky characters in an
         # otherwise human-readable script
-        compressed_elf = zlib.compress(elf, self.zCompressionLevel)
+        compressed_elf = zlib.compress(elf, self.compression_level)
         encoded = b64encode(compressed_elf)
 
         return encoded
@@ -353,7 +353,7 @@ def main() -> int:
 
     CG = CodeGenerator()
 
-    CG.zCompressionLevel = args.compression_level  # defaults to 9
+    CG.compression_level = args.compression_level  # defaults to 9
     CG.wrap = args.wrap  # defaults to 0, no wrap
 
     if args.target_architecture == "autodetect":
