@@ -8,6 +8,10 @@ This Python script generates interpreted code which creates the supplied ELF as 
 
 The technique used for this is explained [here](https://magisterquis.github.io/2018/03/31/in-memory-only-elf-execution.html).
 
+With default options for each interpreter, running binaries using `fee` does not write to disk whatsoever. This can be verified using tools such as `strace`.
+
+`fee` also completely ignores and bypasses `noexec` mount flags, even if they were set on `/proc`.
+
 
 ### Target requirements
 
