@@ -38,11 +38,18 @@ def _get_e_machine(header: bytes) -> int:
     return machine
 
 
+def _err_stdin_flag(name, flag) -> int:
+    print_err(f"error: {name} ('-{flag}') is required when using stdin\n")
+    print_err("Use --help for more information.\n")
+    return 1
+
+
 class CodeGenerator:
     def __init__(self) -> None:
         self.compression_level = 9
         self.wrap = 0
         self.syscall = None
+        self.use_stdin = False
         self._meta = self._Python
         self._generator = None
 
@@ -85,9 +92,7 @@ class CodeGenerator:
             kwargs.pop("path", None)
 
         # let's try to hide our tracks a bit better
-        return (
-            f" set +o history; unset HISTFILE; {self._generator.with_command(**kwargs)}"
-        )
+        return f" unset HISTFILE; {self._generator.with_command(**kwargs)}"
 
     class _Perl:
         # Perl generator metaclass
@@ -100,6 +105,7 @@ class CodeGenerator:
                     "Perl generator cannot resolve the syscall using libc, specify a target architecture"
                 )
             self.syscall = outer.syscall
+            self.use_stdin = outer.use_stdin
 
         def with_command(self, path="/usr/bin/env perl") -> str:
             escaped = self.output.replace('"', '\\"')
@@ -110,10 +116,21 @@ class CodeGenerator:
             self.output += f"{line};\n"
 
         def add_header(self) -> None:
-            self.add("use MIME::Base64")
-            self.add("use Compress::Zlib")
+            if not self.use_stdin:
+                self.add("use MIME::Base64")
+                self.add("use Compress::Zlib")
 
         def add_elf(self, elf: bytes) -> None:
+            if self.use_stdin:
+                self.add("open F, '</proc/self/fd/0'")
+                self.add("binmode(F)")
+                self.add("binmode(F)")
+                self.add("{\nlocal $/")
+                self.add("$e = <F>")
+                self.add("}")
+                self.add("close(F)")
+                return
+
             # prepare elf
             encoded = self.prep_elf(elf).decode("ascii")
 
@@ -150,6 +167,7 @@ class CodeGenerator:
             self.prep_elf = outer._prepare_elf
             self.wrap = outer.wrap
             self.syscall = outer.syscall
+            self.use_stdin = outer.use_stdin
 
         def with_command(self, path="/usr/bin/env python") -> str:
             escaped = self.output.replace('"', '\\"')
@@ -159,7 +177,10 @@ class CodeGenerator:
             self.output += f"{line}\n"
 
         def add_header(self) -> None:
-            self.add("import ctypes, os, base64, zlib")
+            imports = "ctypes, os"
+            if not self.use_stdin:
+                imports += ", base64, zlib"
+            self.add(f"import {imports}")
             self.add("l = ctypes.CDLL(None)")
             if self.syscall:
                 self.add("s = l.syscall")  # we specify the syscall manually
@@ -167,6 +188,14 @@ class CodeGenerator:
                 self.add("s = l.memfd_create")  # dynamic
 
         def add_elf(self, elf: bytes) -> None:
+            if self.use_stdin:
+                self.add("from sys import stdin, version_info")
+                self.add("if version_info >= (3, 0):")
+                self.add(" e = stdin.buffer.read()")
+                self.add("else:")
+                self.add(" e = stdin.read()")
+                return
+
             # prepare elf
             encoded = f"{self.prep_elf(elf)}"
 
@@ -207,6 +236,7 @@ class CodeGenerator:
                     "Ruby generator cannot resolve the syscall using libc, specify a target architecture"
                 )
             self.syscall = outer.syscall
+            self.use_stdin = outer.use_stdin
 
         def with_command(self, path="/usr/bin/env ruby") -> str:
             escaped = self.output.replace('"', '\\"')
@@ -217,10 +247,16 @@ class CodeGenerator:
             self.output += f"{line}\n"
 
         def add_header(self) -> None:
-            self.add("require 'base64'")
-            self.add("require 'zlib'")
+            if not self.use_stdin:
+                self.add("require 'base64'")
+                self.add("require 'zlib'")
 
         def add_elf(self, elf: bytes) -> None:
+            if self.use_stdin:
+                self.add("$stdin.binmode")
+                self.add("e = $stdin.read")
+                return
+
             # prepare elf
             encoded = self.prep_elf(elf).decode("ascii")
 
@@ -287,7 +323,9 @@ def main() -> int:
         description="Print code to stdout to execute an ELF without dropping files."
     )
     parser.add_argument(
-        "path", type=argparse.FileType("rb"), help="path to the ELF file"
+        "path",
+        type=str,
+        help="path to the ELF file (use '-' to read from stdin at runtime)",
     )
     arch_or_syscall_group = parser.add_mutually_exclusive_group()
     arch_or_syscall_group.add_argument(
@@ -348,34 +386,49 @@ def main() -> int:
     args = parser.parse_args()
 
     argv = args.argv
-    if not argv:
-        # argv not specified, so let's just call it with the basename on the host
-        argv = os.path.basename(args.path.name)
-
-    if args.interpreter_path and not args.with_command:
-        print_err("note: '-p' flag meaningless without '-c'\n")
-
-    # read the elf
-    elf = args.path.read()
-    args.path.close()
-
-    code_generator = CodeGenerator()
-
-    code_generator.compression_level = args.compression_level  # defaults to 9
-    code_generator.wrap = args.wrap  # defaults to 0, no wrap
-
-    if args.target_architecture == "autodetect":
-        args.target_architecture = _get_e_machine(elf[:20])
-
-    if args.target_architecture != "libc":
-        # map to syscall number
-        syscall = syscall_numbers.get(args.target_architecture)
-    else:
-        syscall = args.syscall  # None if not specified
-
-    code_generator.syscall = syscall
 
     try:
+        use_stdin = False
+        if args.path == "-":
+            use_stdin = True
+
+        if use_stdin:
+            if not argv:
+                return _err_stdin_flag("argv", "a")
+            if not args.target_architecture or args.target_architecture == "autodetect":
+                return _err_stdin_flag("arch", "t")
+
+        if not argv:
+            # argv not specified, so let's just call it with the basename on the host
+            argv = os.path.basename(args.path)
+
+        if args.interpreter_path and not args.with_command:
+            print_err("note: '-p' flag meaningless without '-c'\n")
+
+        # read the elf
+        if not use_stdin:
+            with open(args.path, "rb") as elf_file:
+                elf = elf_file.read()
+        else:
+            elf = None
+
+        code_generator = CodeGenerator()
+
+        code_generator.compression_level = args.compression_level  # defaults to 9
+        code_generator.wrap = args.wrap  # defaults to 0, no wrap
+        code_generator.use_stdin = use_stdin  # defaults to False
+
+        if args.target_architecture == "autodetect" and not use_stdin:
+            args.target_architecture = _get_e_machine(elf[:20])
+
+        if args.target_architecture != "libc":
+            # map to syscall number
+            syscall = syscall_numbers.get(args.target_architecture)
+        else:
+            syscall = args.syscall  # None if not specified
+
+        code_generator.syscall = syscall
+
         if args.language:
             code_generator.set_lang(args.language)
 

@@ -77,18 +77,25 @@ If you want to customise the arguments, use the `--argv` flag (`-a`):
 $ fee -a "killall sshd" ./busybox > output.py
 ```
 
+**If you don't wish to include the binary in the generated output**, you can instruct `fee` to generate a script which accepts the ELF from stdin at runtime. For this, use `-` for the filename. You can combine all of these options for clever one-liners:
+```console
+$ ssh user@target "$(fee -c -a "echo hi from stdin" -t "libc" -)" < ./busybox
+
+hi from stdin
+```
+
 __NB!__ By default, the script parses the encoded ELF's header to determine the target architecture. This is required to use the correct syscall number when calling `memfd_create`. If this fails, you can use the `--target-architecture` (`-t`) flag to explicitly generate a syscall number. Alternatively, you can use the `libc` target to resolve the symbol automatically at runtime, although this only works when generating Python code.
 For more exotic platforms, you should specify the syscall number manually. You need to search for `memfd_create` in your target's architecture's syscall table. This is located in various places in the Linux kernel sources. Just Googling `[architecture] syscall table` is perhaps the easiest. You can then specify the syscall number using the `--syscall` flag (`-s`).
 
 Full help text:
 ```
-usage: fee [-h] [-t ARCH | -s NUM] [-a ARGV] [-l LANG] [-c] [-p PATH] [-w CHARS] [-z LEVEL]
+usage: fee.py [-h] [-t ARCH | -s NUM] [-a ARGV] [-l LANG] [-c] [-p PATH] [-w CHARS] [-z LEVEL]
               path
 
 Print code to stdout to execute an ELF without dropping files.
 
 positional arguments:
-  path                  path to the ELF file
+  path                  path to the ELF file (use '-' to read from stdin at runtime)
 
 optional arguments:
   -h, --help            show this help message and exit
