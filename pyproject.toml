@@ -5,6 +5,10 @@ description = "Execute ELF files without dropping them on disk"
 authors = ["Rasmus Moorats <xx@nns.ee>"]
 license = "GPLv3"
 
+readme = "README.md"
+repository = "https://github.com/nnsee/fileless-elf-exec"
+homepage = "https://github.com/nnsee/fileless-elf-exec"
+
 [tool.poetry.dependencies]
 python = ">=3.6.2,<4.0"
 
