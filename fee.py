@@ -153,7 +153,7 @@ class CodeGenerator:
 
         def with_command(self, path="/usr/bin/env python") -> str:
             escaped = self.output.replace('"', '\\"')
-            return f'{path} -c "{escaped}"'
+            return f'{path} -Bc "{escaped}"'
 
         def add(self, line: str) -> None:
             self.output += f"{line}\n"

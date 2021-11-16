@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fee"
-version = "0.1.0"
+version = "0.1.1"
 description = "Execute ELF files without dropping them on disk"
 authors = ["Rasmus Moorats <xx@nns.ee>"]
 license = "GPLv3"
