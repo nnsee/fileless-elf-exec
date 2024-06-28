@@ -10,11 +10,11 @@ repository = "https://github.com/nnsee/fileless-elf-exec"
 homepage = "https://github.com/nnsee/fileless-elf-exec"
 
 [tool.poetry.dependencies]
-python = ">=3.6.2,<4.0"
+python = ">=3.8,<4.0"
 
 [tool.poetry.dev-dependencies]
-pylint = "^2.11.1"
-black = "^21.10b0"
+pylint = "^3.2.5"
+black = "^24.4.2"
 
 [tool.poetry.scripts]
 fee = "fee:main"
